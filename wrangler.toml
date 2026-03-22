@@ -1,0 +1,39 @@
+name = "sentry-quinn"
+type = "service"
+account_id = "8e26c4fb99bfe3f5f36cede6e1e75d1a"
+workers_dev = true
+main = "src/index.ts"
+compatibility_date = "2024-03-01"
+
+[env.production]
+routes = [
+  { pattern = "sentry-quinn.lpeluso.workers.dev/*", zone_name = "lpeluso.dev" }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "taylor-ai"
+database_id = "ba02a8c6-bcff-4119-b797-0b4250a3edcf"
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "4c18d1ac623145ab86901d5fb44a022a"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "12357ca7f0234cc3815dd9505cd02daa"
+
+[env.production.kv_namespaces]
+binding = "STATE"
+id = "4c18d1ac623145ab86901d5fb44a022a"
+
+binding = "CACHE"
+id = "12357ca7f0234cc3815dd9505cd02daa"
+
+[build]
+command = "npm install && tsc"
+cwd = "."
+main = "src/index.ts"
+
+[build.upload]
+format = "service-worker"

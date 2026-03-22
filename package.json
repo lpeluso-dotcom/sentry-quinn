@@ -1,0 +1,20 @@
+{
+  "name": "sentry-quinn",
+  "version": "1.0.0",
+  "description": "Post-job tech debrief worker for Miss Dawn dispatcher",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "itty-router": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240605.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0",
+    "wrangler": "^3.0.0"
+  }
+}
