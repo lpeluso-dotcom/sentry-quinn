@@ -3,14 +3,35 @@ import { searchPricebook, jsonResponse } from '../utils/db';
 
 export async function handlePricebook(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as { code?: string; name?: string };
-    if (!body.code && !body.name) {
-      return jsonResponse({ error: 'Missing code or name' }, 400);
+    const body = (await req.json()) as Record<string, any>;
+    console.log('[Pricebook] Raw body keys:', Object.keys(body), 'body:', JSON.stringify(body).substring(0, 500));
+
+    // Accept multiple field names — Retell may send "name", "query", "search", or "item"
+    const code = body.code as string | undefined;
+    const searchTerm = body.query || body.search || body.item || body.name || body.description;
+
+    // Filter out Retell metadata that might leak into search
+    const cleanTerm = (searchTerm && typeof searchTerm === 'string' &&
+      !searchTerm.includes('validate_pricebook') &&
+      !searchTerm.includes('execution_message'))
+      ? searchTerm : undefined;
+
+    if (!code && !cleanTerm) {
+      return jsonResponse({
+        status: 'error',
+        message: 'Please provide a search term. Example: {"query": "bidet"} or {"name": "water heater"}',
+        received: body
+      }, 200);
     }
 
-    const items = await searchPricebook(env.DB, body.code, body.name);
+    const items = await searchPricebook(env.DB, code, cleanTerm);
+    console.log('[Pricebook] Found', items.length, 'items for', code || cleanTerm);
+
     if (!items.length) {
-      return jsonResponse({ status: 'not_found', message: 'Item not found in pricebook' }, 200);
+      return jsonResponse({
+        status: 'not_found',
+        message: `No pricebook items found matching "${code || cleanTerm}". Try a broader term or different spelling.`
+      }, 200);
     }
 
     return jsonResponse({
