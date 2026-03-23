@@ -134,13 +134,33 @@ export async function searchPricebook(db: D1Database, code?: string, name?: stri
       return [];
     }
     if (name) {
-      // Fuzzy name search across pb_services (most relevant for techs)
-      const results = await db.prepare(
+      // Search services first (most relevant for techs), then materials, then equipment
+      const q = `%${name}%`;
+      const services = await db.prepare(
         `SELECT code, name, description, category_name as category, price, member_price, 'service' as type
          FROM pb_services WHERE active = 1 AND (name LIKE ? OR description LIKE ? OR category_name LIKE ?)
          ORDER BY price DESC LIMIT 5`
-      ).bind(`%${name}%`, `%${name}%`, `%${name}%`).all();
-      return results?.results || [];
+      ).bind(q, q, q).all();
+
+      const materials = await db.prepare(
+        `SELECT code, name, description, category_name as category, cost as price, NULL as member_price, 'material' as type
+         FROM pb_materials WHERE active = 1 AND (name LIKE ? OR description LIKE ? OR category_name LIKE ?)
+         ORDER BY cost DESC LIMIT 3`
+      ).bind(q, q, q).all();
+
+      const equipment = await db.prepare(
+        `SELECT code, name, description, category_name as category, price, member_price, 'equipment' as type
+         FROM pb_equipment WHERE active = 1 AND (name LIKE ? OR description LIKE ? OR category_name LIKE ?)
+         ORDER BY price DESC LIMIT 3`
+      ).bind(q, q, q).all();
+
+      const all = [
+        ...(services?.results || []),
+        ...(materials?.results || []),
+        ...(equipment?.results || []),
+      ];
+      // Return top 8 by price descending
+      return all.sort((a: any, b: any) => (b.price || 0) - (a.price || 0)).slice(0, 8);
     }
     return [];
   } catch {
