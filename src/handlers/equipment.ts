@@ -1,9 +1,11 @@
+import { extractArgs } from '../utils/retell';
 import { Env } from '../index';
 import { searchPricebook, searchCustomers, jsonResponse } from '../utils/db';
 
 export async function handleEquipment(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as {
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody) as {
       mode: string; customer_name?: string; customer_id?: string;
       query?: string; category?: string; brand?: string;
     };

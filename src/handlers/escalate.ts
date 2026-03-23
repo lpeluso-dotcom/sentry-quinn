@@ -1,10 +1,12 @@
+import { extractArgs } from '../utils/retell';
 import { Env } from '../index';
 import { createSTTask } from '../utils/st-api';
 import { fireEscalationWebhook } from '../utils/make-webhook';
 
 export async function handleEscalate(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as {
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody) as {
       job_id?: string;
       technician?: string;
       escalation_flags: string | string[];

@@ -1,6 +1,7 @@
 import { Env } from '../index';
 import { getTechnicianByPhone, getJobById, jsonResponse } from '../utils/db';
 import { getTechnicianByPhoneFromST, getJobFromST } from '../utils/st-api';
+import { extractArgs } from '../utils/retell';
 
 async function findTechByName(db: D1Database, name: string): Promise<any> {
   // Try exact match first, then LIKE match
@@ -18,7 +19,8 @@ async function findTechByName(db: D1Database, name: string): Promise<any> {
 
 export async function handleIdentifyTech(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as Record<string, any>;
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody);
     const techName = body.technician_name || body.name;
 
     let tech: any = null;

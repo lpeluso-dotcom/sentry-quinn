@@ -1,9 +1,11 @@
+import { extractArgs } from '../utils/retell';
 import { Env } from '../index';
 import { searchEstimates, jsonResponse } from '../utils/db';
 
 export async function handleEstimate(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as { job_id?: string; customer_name?: string; estimate_id?: string };
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody) as { job_id?: string; customer_name?: string; estimate_id?: string };
     if (!body.job_id && !body.customer_name && !body.estimate_id) {
       return jsonResponse({ error: 'Missing job_id, customer_name, or estimate_id' }, 400);
     }

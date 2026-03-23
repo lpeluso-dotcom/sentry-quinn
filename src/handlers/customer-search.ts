@@ -1,9 +1,11 @@
 import { Env } from '../index';
 import { searchCustomers, jsonResponse } from '../utils/db';
+import { extractArgs } from '../utils/retell';
 
 export async function handleCustomerSearch(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as Record<string, any>;
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody);
     const query = body.customer_name || body.name || body.phone || body.customer_id || '';
     if (!query) {
       return jsonResponse({ error: 'Missing name, phone, or customer_id' }, 400);

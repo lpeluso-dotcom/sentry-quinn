@@ -1,9 +1,11 @@
+import { extractArgs } from '../utils/retell';
 import { Env } from '../index';
 import { searchInvoices, jsonResponse } from '../utils/db';
 
 export async function handleInvoice(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as { job_id?: string; customer_name?: string; invoice_number?: string };
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody) as { job_id?: string; customer_name?: string; invoice_number?: string };
     if (!body.job_id && !body.customer_name && !body.invoice_number) {
       return jsonResponse({ error: 'Missing job_id, customer_name, or invoice_number' }, 400);
     }

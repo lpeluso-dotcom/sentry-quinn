@@ -1,3 +1,4 @@
+import { extractArgs } from '../utils/retell';
 import { Env } from '../index';
 import { jsonResponse } from '../utils/db';
 import { getTechnicianAppointments } from '../utils/st-api';
@@ -14,7 +15,8 @@ async function findTechByName(db: D1Database, name: string): Promise<any> {
 
 export async function handleAppointments(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as {
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody) as {
       technician_name?: string;
       technician_id?: string;
     };

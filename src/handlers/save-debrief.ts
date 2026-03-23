@@ -1,10 +1,12 @@
+import { extractArgs } from '../utils/retell';
 import { Env } from '../index';
 import { saveDebrief, QuinnDebrief } from '../utils/db';
 import { fireTranscriptWebhook } from '../utils/make-webhook';
 
 export async function handleSaveDebrief(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as any;
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody) as any;
 
     if (!body.job_id || !body.technician) {
       return new Response(

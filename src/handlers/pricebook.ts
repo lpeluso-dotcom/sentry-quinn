@@ -1,36 +1,40 @@
 import { Env } from '../index';
 import { searchPricebook, jsonResponse } from '../utils/db';
 
+import { extractArgs } from '../utils/retell';
+
 export async function handlePricebook(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as Record<string, any>;
-    console.log('[Pricebook] Raw body keys:', Object.keys(body), 'body:', JSON.stringify(body).substring(0, 500));
+    const rawBody = (await req.json()) as Record<string, any>;
+    const args = extractArgs(rawBody);
 
-    // Accept multiple field names — Retell may send "name", "query", "search", or "item"
-    const code = body.code as string | undefined;
-    const searchTerm = body.query || body.search || body.item || body.name || body.description;
+    console.log('[Pricebook] Raw keys:', Object.keys(rawBody).join(','), '| Args keys:', Object.keys(args).join(','));
 
-    // Filter out Retell metadata that might leak into search
+    // Accept multiple field names for the search term
+    const code = args.code as string | undefined;
+    const searchTerm = args.query || args.search || args.item || args.name || args.description;
+
+    // Filter out Retell internal values
     const cleanTerm = (searchTerm && typeof searchTerm === 'string' &&
+      searchTerm.length < 100 &&
       !searchTerm.includes('validate_pricebook') &&
-      !searchTerm.includes('execution_message'))
-      ? searchTerm : undefined;
+      !searchTerm.includes('execution_message') &&
+      !searchTerm.includes('call_id'))
+      ? searchTerm.trim() : undefined;
 
     if (!code && !cleanTerm) {
       return jsonResponse({
-        status: 'error',
-        message: 'Please provide a search term. Example: {"query": "bidet"} or {"name": "water heater"}',
-        received: body
+        status: 'not_found',
+        message: 'No search term provided. Tell me what you need and I\'ll look it up.',
       }, 200);
     }
 
     const items = await searchPricebook(env.DB, code, cleanTerm);
-    console.log('[Pricebook] Found', items.length, 'items for', code || cleanTerm);
 
     if (!items.length) {
       return jsonResponse({
         status: 'not_found',
-        message: `No pricebook items found matching "${code || cleanTerm}". Try a broader term or different spelling.`
+        message: `Nothing found for "${code || cleanTerm}". Try a different term.`
       }, 200);
     }
 

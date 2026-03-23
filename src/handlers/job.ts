@@ -1,10 +1,12 @@
+import { extractArgs } from '../utils/retell';
 import { Env } from '../index';
 import { getJobById, jsonResponse } from '../utils/db';
 import { getJobFromST } from '../utils/st-api';
 
 export async function handleJob(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as {
+    const rawBody = (await req.json()) as Record<string, any>;
+    const body = extractArgs(rawBody) as {
       job_id?: string;
       customer_name?: string;
       address?: string;
