@@ -1,47 +1,33 @@
 import { Env } from '../index';
-import { getPricebookItem } from '../utils/db';
+import { searchPricebook, jsonResponse } from '../utils/db';
 
 export async function handlePricebook(req: Request, env: Env): Promise<Response> {
   try {
     const body = (await req.json()) as { code?: string; name?: string };
-
     if (!body.code && !body.name) {
-      return new Response(
-        JSON.stringify({ error: 'Missing code or name' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: 'Missing code or name' }, 400);
     }
 
-    const item = await getPricebookItem(env.DB, body.code, body.name);
-
-    if (!item) {
-      return new Response(
-        JSON.stringify({
-          status: 'not_found',
-          message: 'Item not found in pricebook',
-        }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+    const items = await searchPricebook(env.DB, body.code, body.name);
+    if (!items.length) {
+      return jsonResponse({ status: 'not_found', message: 'Item not found in pricebook' }, 404);
     }
 
-    return new Response(
-      JSON.stringify({
-        status: 'success',
-        item: {
-          code: item.code,
-          name: item.name,
-          description: item.description || '',
-          price: item.price || 0,
-          category: item.category || '',
-        },
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({
+      status: 'success',
+      count: items.length,
+      items: items.map(item => ({
+        code: item.code,
+        name: item.name,
+        description: item.description || '',
+        price: item.price || 0,
+        member_price: item.member_price || null,
+        category: item.category || '',
+        type: item.type,
+      })),
+    });
   } catch (err) {
     console.error('Pricebook handler error:', err);
-    return new Response(
-      JSON.stringify({ error: 'Internal error', details: (err as Error).message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ error: 'Internal error', details: (err as Error).message }, 500);
   }
 }

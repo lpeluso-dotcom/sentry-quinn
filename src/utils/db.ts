@@ -118,19 +118,110 @@ export function getInvoiceById(db: D1Database, id: string) {
      FROM invoices WHERE invoice_id = ? LIMIT 1`, id);
 }
 
-export async function getPricebookItem(db: D1Database, code?: string, name?: string): Promise<any> {
-  if (code) {
-    return safeFirst(db, `SELECT * FROM pricebook WHERE code = ? LIMIT 1`, code);
-  }
-  if (name) {
-    try {
-      const results = await db.prepare(
-        `SELECT * FROM pricebook WHERE name LIKE ? LIMIT 5`
-      ).bind(`%${name}%`).all();
-      return results?.results?.[0] || null;
-    } catch {
-      return null;
+export async function searchPricebook(db: D1Database, code?: string, name?: string): Promise<any[]> {
+  try {
+    if (code) {
+      // Exact code match across all pb tables
+      const svc = await safeFirst(db,
+        `SELECT code, name, description, category_name as category, price, member_price, 'service' as type FROM pb_services WHERE code = ? LIMIT 1`, code);
+      if (svc) return [svc];
+      const mat = await safeFirst(db,
+        `SELECT code, name, description, category_name as category, cost as price, 'material' as type FROM pb_materials WHERE code = ? LIMIT 1`, code);
+      if (mat) return [mat];
+      const equip = await safeFirst(db,
+        `SELECT code, name, description, category_name as category, price, 'equipment' as type FROM pb_equipment WHERE code = ? LIMIT 1`, code);
+      if (equip) return [equip];
+      return [];
     }
+    if (name) {
+      // Fuzzy name search across pb_services (most relevant for techs)
+      const results = await db.prepare(
+        `SELECT code, name, description, category_name as category, price, member_price, 'service' as type
+         FROM pb_services WHERE active = 1 AND (name LIKE ? OR description LIKE ? OR category_name LIKE ?)
+         ORDER BY price DESC LIMIT 5`
+      ).bind(`%${name}%`, `%${name}%`, `%${name}%`).all();
+      return results?.results || [];
+    }
+    return [];
+  } catch {
+    return [];
   }
-  return null;
+}
+
+export async function searchCustomers(db: D1Database, query: string): Promise<any[]> {
+  try {
+    const normalized = normalizePhone(query);
+    // Try phone match first if query looks like a number
+    if (normalized.length >= 7) {
+      const results = await db.prepare(
+        `SELECT customer_id as id, name, phone, email, address, city, state, zip
+         FROM customers WHERE phone LIKE ? LIMIT 5`
+      ).bind(`%${normalized}%`).all();
+      if (results?.results?.length) return results.results;
+    }
+    // Fuzzy name/address search
+    const results = await db.prepare(
+      `SELECT customer_id as id, name, phone, email, address, city, state, zip
+       FROM customers WHERE name LIKE ? OR address LIKE ? LIMIT 5`
+    ).bind(`%${query}%`, `%${query}%`).all();
+    return results?.results || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function searchInvoices(db: D1Database, opts: { job_id?: string; customer_name?: string; invoice_number?: string }): Promise<any[]> {
+  try {
+    if (opts.invoice_number) {
+      const r = await safeFirst(db,
+        `SELECT invoice_id as id, invoice_number, job_id, customer_name, total, balance, invoice_status, created_date
+         FROM invoices WHERE invoice_number = ? LIMIT 1`, opts.invoice_number);
+      return r ? [r] : [];
+    }
+    if (opts.job_id) {
+      const results = await db.prepare(
+        `SELECT invoice_id as id, invoice_number, job_id, customer_name, total, balance, invoice_status, created_date
+         FROM invoices WHERE job_id = ? ORDER BY created_date DESC LIMIT 5`
+      ).bind(opts.job_id).all();
+      return results?.results || [];
+    }
+    if (opts.customer_name) {
+      const results = await db.prepare(
+        `SELECT invoice_id as id, invoice_number, job_id, customer_name, total, balance, invoice_status, created_date
+         FROM invoices WHERE customer_name LIKE ? ORDER BY created_date DESC LIMIT 5`
+      ).bind(`%${opts.customer_name}%`).all();
+      return results?.results || [];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export async function searchEstimates(db: D1Database, opts: { job_id?: string; customer_name?: string; estimate_id?: string }): Promise<any[]> {
+  try {
+    if (opts.estimate_id) {
+      const r = await safeFirst(db,
+        `SELECT estimate_id as id, job_id, customer_name, status, summary, total, items_json, created_date
+         FROM estimates WHERE estimate_id = ? LIMIT 1`, opts.estimate_id);
+      return r ? [r] : [];
+    }
+    if (opts.job_id) {
+      const results = await db.prepare(
+        `SELECT estimate_id as id, job_id, customer_name, status, summary, total, items_json, created_date
+         FROM estimates WHERE job_id = ? ORDER BY created_date DESC LIMIT 5`
+      ).bind(opts.job_id).all();
+      return results?.results || [];
+    }
+    if (opts.customer_name) {
+      const results = await db.prepare(
+        `SELECT estimate_id as id, job_id, customer_name, status, summary, total, items_json, created_date
+         FROM estimates WHERE customer_name LIKE ? ORDER BY created_date DESC LIMIT 5`
+      ).bind(`%${opts.customer_name}%`).all();
+      return results?.results || [];
+    }
+    return [];
+  } catch {
+    return [];
+  }
 }

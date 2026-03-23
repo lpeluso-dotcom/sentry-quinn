@@ -8,6 +8,10 @@ import { handleSaveDebrief } from './handlers/save-debrief';
 import { handleEscalate } from './handlers/escalate';
 import { handleWebhook } from './handlers/webhook';
 import { handleIdentifyTech } from './handlers/identify-tech';
+import { handleCustomerSearch } from './handlers/customer-search';
+import { handleEquipment } from './handlers/equipment';
+import { handleInvoice } from './handlers/invoice';
+import { handleEstimate } from './handlers/estimate';
 
 const router = Router();
 
@@ -29,52 +33,27 @@ export default {
   },
 };
 
-// Health check
 router.get('/health', () => ({
   status: 'ok',
   service: 'sentry-quinn',
-  version: '1.0.0',
+  version: '2.0.0',
   timestamp: new Date().toISOString(),
 }));
 
-// Implemented handlers
 router.post('/api/quinn/identify-tech', (req, env) => handleIdentifyTech(req, env));
 router.post('/api/quinn/appointments', (req, env) => handleAppointments(req, env));
 router.post('/api/quinn/job', (req, env) => handleJob(req, env));
 router.post('/api/quinn/customer', (req, env) => handleCustomer(req, env));
+router.post('/api/quinn/customer-search', (req, env) => handleCustomerSearch(req, env));
 router.post('/api/quinn/location', (req, env) => handleLocation(req, env));
 router.post('/api/quinn/pricebook', (req, env) => handlePricebook(req, env));
+router.post('/api/quinn/equipment', (req, env) => handleEquipment(req, env));
+router.post('/api/quinn/invoice', (req, env) => handleInvoice(req, env));
+router.post('/api/quinn/estimate', (req, env) => handleEstimate(req, env));
 router.post('/api/quinn/save-debrief', (req, env) => handleSaveDebrief(req, env));
 router.post('/api/quinn/escalate', (req, env) => handleEscalate(req, env));
 router.post('/api/quinn/webhook', (req, env) => handleWebhook(req, env));
 
-// Placeholder for endpoints not yet in use
-router.post('/api/quinn/customer-search', () =>
-  new Response(JSON.stringify({ error: 'Not implemented' }), {
-    status: 501,
-    headers: { 'Content-Type': 'application/json' },
-  })
-);
-router.post('/api/quinn/equipment', () =>
-  new Response(JSON.stringify({ error: 'Not implemented' }), {
-    status: 501,
-    headers: { 'Content-Type': 'application/json' },
-  })
-);
-router.post('/api/quinn/invoice', () =>
-  new Response(JSON.stringify({ error: 'Not implemented' }), {
-    status: 501,
-    headers: { 'Content-Type': 'application/json' },
-  })
-);
-router.post('/api/quinn/estimate', () =>
-  new Response(JSON.stringify({ error: 'Not implemented' }), {
-    status: 501,
-    headers: { 'Content-Type': 'application/json' },
-  })
-);
-
-// Fallback
 router.all('*', () =>
   new Response(JSON.stringify({ error: 'Not found' }), {
     status: 404,
