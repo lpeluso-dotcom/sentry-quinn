@@ -180,16 +180,19 @@ export async function searchCustomers(db: D1Database, query: string): Promise<an
       if (results?.results?.length) return results.results;
     }
 
-    // Try exact phrase match first
+    // Strip punctuation for matching (Victor's → Victors, O'Brien → OBrien)
+    const clean = query.replace(/[''`.,!?]/g, '');
+
+    // Try exact phrase match first (with and without punctuation)
     const exact = await db.prepare(
       `SELECT customer_id as id, name, phone, email, address, city, state, zip
-       FROM customers WHERE name LIKE ? OR address LIKE ? LIMIT 5`
-    ).bind(`%${query}%`, `%${query}%`).all();
+       FROM customers WHERE name LIKE ? OR name LIKE ? OR address LIKE ? OR address LIKE ? LIMIT 5`
+    ).bind(`%${query}%`, `%${clean}%`, `%${query}%`, `%${clean}%`).all();
     if (exact?.results?.length) return exact.results;
 
-    // Fuzzy: split into words, match each word individually (handles STT mishearing)
-    // "Seminar Bruin" → match customers where name contains "Seminar" OR "Bruin"
-    const words = query.split(/\s+/).filter(w => w.length >= 3);
+    // Fuzzy: split into words, strip punctuation, match each word individually
+    // "Victor's Restaurant" → ["Victor", "Restaurant"] → matches "Victors " in DB
+    const words = clean.split(/\s+/).filter(w => w.length >= 3);
     if (words.length > 0) {
       const conditions = words.map(() => 'LOWER(name) LIKE LOWER(?)').join(' OR ');
       const params = words.map(w => `%${w}%`);

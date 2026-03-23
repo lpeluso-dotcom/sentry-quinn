@@ -12,6 +12,7 @@ import { handleCustomerSearch } from './handlers/customer-search';
 import { handleEquipment } from './handlers/equipment';
 import { handleInvoice } from './handlers/invoice';
 import { handleEstimate } from './handlers/estimate';
+import { handleSyncCustomers } from './handlers/sync-customers';
 
 const router = Router();
 
@@ -53,6 +54,7 @@ router.post('/api/quinn/estimate', (req, env) => handleEstimate(req, env));
 router.post('/api/quinn/save-debrief', (req, env) => handleSaveDebrief(req, env));
 router.post('/api/quinn/escalate', (req, env) => handleEscalate(req, env));
 router.post('/api/quinn/webhook', (req, env) => handleWebhook(req, env));
+router.post('/api/admin/sync-customers', (req, env) => handleSyncCustomers(req, env));
 
 router.all('*', () =>
   new Response(JSON.stringify({ error: 'Not found' }), {
