@@ -1,6 +1,16 @@
 import { Env } from '../index';
-import { getTechnicianByPhone, getTechnicianById } from '../utils/db';
+import { jsonResponse } from '../utils/db';
 import { getTechnicianAppointments } from '../utils/st-api';
+
+async function findTechByName(db: D1Database, name: string): Promise<any> {
+  const exact = await db.prepare(
+    `SELECT tech_id as id, name FROM technicians WHERE LOWER(name) = LOWER(?) AND active = 1 LIMIT 1`
+  ).bind(name).first();
+  if (exact) return exact;
+  return db.prepare(
+    `SELECT tech_id as id, name FROM technicians WHERE LOWER(name) LIKE LOWER(?) AND active = 1 LIMIT 1`
+  ).bind(`%${name}%`).first();
+}
 
 export async function handleAppointments(req: Request, env: Env): Promise<Response> {
   try {
@@ -11,22 +21,19 @@ export async function handleAppointments(req: Request, env: Env): Promise<Respon
 
     let techId = body.technician_id;
 
-    // If name provided, look up tech by name (search D1 technicians table)
+    // If name provided, look up tech by name
     if (!techId && body.technician_name) {
-      const tech = await getTechnicianByPhone(env.DB, body.technician_name);
+      const tech = await findTechByName(env.DB, body.technician_name);
       if (tech) {
-        techId = tech.id;
+        techId = String(tech.id);
       }
     }
 
     if (!techId) {
-      return new Response(
-        JSON.stringify({
-          error: 'Technician not found',
-          details: 'Please provide technician_id or a name match in our system',
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({
+        status: 'not_found',
+        message: 'Technician not found. Try passing technician_id directly.',
+      });
     }
 
     // Get appointments from ST API
