@@ -5,7 +5,7 @@ export interface QuinnDebrief {
   customer_name: string;
   technician: string;
   technician_id?: string;
-  date: string;
+  debrief_date: string;
   job_complete: boolean;
   invoice_closed: boolean;
   parts_used?: string;
@@ -40,7 +40,7 @@ export function jsonResponse(data: any, status = 200): Response {
 export async function saveDebrief(db: D1Database, debrief: QuinnDebrief): Promise<void> {
   const {
     retell_call_id, job_id, customer_name, technician, technician_id,
-    date, job_complete, invoice_closed, parts_used, restock_needed,
+    debrief_date, job_complete, invoice_closed, parts_used, restock_needed,
     returns_needed, follow_up_type, follow_up_timing, follow_up_notes,
     equipment_scanned, equipment_missed, property_notes,
     recommendations_observed, recommendations_presented, membership_status,
@@ -50,7 +50,7 @@ export async function saveDebrief(db: D1Database, debrief: QuinnDebrief): Promis
   await db.prepare(`
     INSERT INTO quinn_debriefs (
       retell_call_id, job_id, customer_name, technician, technician_id,
-      date, job_complete, invoice_closed, parts_used, restock_needed,
+      debrief_date, job_complete, invoice_closed, parts_used, restock_needed,
       returns_needed, follow_up_type, follow_up_timing, follow_up_notes,
       equipment_scanned, equipment_missed, property_notes,
       recommendations_observed, recommendations_presented, membership_status,
@@ -58,7 +58,7 @@ export async function saveDebrief(db: D1Database, debrief: QuinnDebrief): Promis
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `).bind(
     retell_call_id, job_id, customer_name, technician, technician_id || null,
-    date, job_complete ? 1 : 0, invoice_closed ? 1 : 0,
+    debrief_date, job_complete ? 1 : 0, invoice_closed ? 1 : 0,
     parts_used || null, restock_needed || null, returns_needed || null,
     follow_up_type || null, follow_up_timing || null, follow_up_notes || null,
     equipment_scanned ? 1 : 0, equipment_missed || null, property_notes || null,

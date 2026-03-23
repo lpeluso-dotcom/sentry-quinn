@@ -5,7 +5,7 @@ const TENANT_ID = '431848990';
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
-async function getSTToken(env: Env): Promise<string> {
+export async function getSTToken(env: Env): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
     return cachedToken.token;
   }

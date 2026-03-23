@@ -21,7 +21,7 @@ export async function handleSaveDebrief(req: Request, env: Env): Promise<Respons
       customer_name: body.customer_name || '',
       technician: body.technician,
       technician_id: body.technician_id,
-      date: body.date || new Date().toISOString().split('T')[0],
+      debrief_date: body.date || new Date().toISOString().split('T')[0],
       job_complete: body.job_complete || false,
       invoice_closed: body.invoice_closed || false,
       parts_used: body.parts_used ? JSON.stringify(body.parts_used) : undefined,

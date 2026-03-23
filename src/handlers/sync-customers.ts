@@ -1,32 +1,11 @@
 import type { Env } from '../index';
+import { jsonResponse } from '../utils/db';
+import { getSTToken } from '../utils/st-api';
 
 const TENANT_ID = '431848990';
-const TOKEN_URL = 'https://auth.servicetitan.io/connect/token';
 const API_BASE = 'https://api.servicetitan.io';
 
-async function getSTToken(env: Env): Promise<string> {
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: env.ST_CLIENT_ID || '',
-      client_secret: env.ST_CLIENT_SECRET || '',
-    }),
-  });
-  const data = await res.json() as any;
-  return data.access_token;
-}
-
-function jsonResponse(body: any, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
 export async function handleSyncCustomers(request: Request, env: Env): Promise<Response> {
-  // Simple auth — require a header
   const key = request.headers.get('x-admin-key');
   if (key !== 'quinn-sync-2026') return jsonResponse({ error: 'Unauthorized' }, 401);
 
@@ -39,7 +18,7 @@ export async function handleSyncCustomers(request: Request, env: Env): Promise<R
     let totalUpserted = 0;
     let hasMore = true;
     const PAGE_SIZE = 200;
-    const MAX_PAGES = 100; // safety cap = 20,000 customers
+    const MAX_PAGES = 100;
 
     while (hasMore && page <= MAX_PAGES) {
       const url = `${API_BASE}/crm/v2/tenant/${TENANT_ID}/customers?pageSize=${PAGE_SIZE}&page=${page}`;
@@ -59,7 +38,6 @@ export async function handleSyncCustomers(request: Request, env: Env): Promise<R
       hasMore = data.hasMore || false;
       totalFetched += customers.length;
 
-      // Batch upsert into D1
       if (customers.length > 0) {
         const stmt = env.DB.prepare(
           `INSERT OR REPLACE INTO customers (customer_id, name, phone, email, address, city, state, zip, customer_type, active, created_date, synced_at)
