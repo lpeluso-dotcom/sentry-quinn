@@ -36,18 +36,18 @@ export async function handleAppointments(req: Request, env: Env): Promise<Respon
     const today = new Date().toISOString().split('T')[0];
     const todaysAppointments = appointments
       .filter(
-        (apt) =>
+        (apt: any) =>
           apt.startDateTime?.startsWith(today) &&
           ['Scheduled', 'Dispatched'].includes(apt.status)
       )
-      .sort((a, b) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime());
+      .sort((a: any, b: any) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime());
 
     return new Response(
       JSON.stringify({
         status: 'success',
         technician_id: techId,
         count: todaysAppointments.length,
-        appointments: todaysAppointments.map((apt) => ({
+        appointments: todaysAppointments.map((apt: any) => ({
           id: apt.id,
           customer_name: apt.customerName,
           job_id: apt.jobId,

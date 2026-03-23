@@ -1,191 +1,128 @@
 import { Env } from '../index';
+import { normalizePhone } from './db';
+
+const TENANT_ID = '431848990';
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 async function getSTToken(env: Env): Promise<string> {
-  // Check cache
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
     return cachedToken.token;
   }
 
-  const tenantId = '431848990';
   const clientId = env.ST_CLIENT_ID;
   const clientSecret = env.ST_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error('ST credentials missing');
-  }
-
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope: 'accounting.jobs jpm.jobs crm.customers dispatch.dispatch telecom.calls',
-  });
+  if (!clientId || !clientSecret) throw new Error('ST credentials missing');
 
   const response = await fetch('https://auth.servicetitan.io/connect/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: 'accounting.jobs jpm.jobs crm.customers dispatch.dispatch telecom.calls',
+    }).toString(),
   });
 
-  if (!response.ok) {
-    throw new Error(`ST token error: ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`ST token error: ${response.status}`);
 
   const data = (await response.json()) as { access_token: string; expires_in: number };
-  const token = data.access_token;
-  const expiresIn = data.expires_in || 3600;
-
   cachedToken = {
-    token,
-    expiresAt: Date.now() + expiresIn * 1000 - 60000, // Refresh 1 min before expiry
+    token: data.access_token,
+    expiresAt: Date.now() + (data.expires_in || 3600) * 1000 - 60000,
   };
-
-  return token;
+  return data.access_token;
 }
 
 export async function stGet(env: Env, path: string): Promise<any> {
   const token = await getSTToken(env);
-  const url = `https://api.servicetitan.io${path}`;
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+  const response = await fetch(`https://api.servicetitan.io${path}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
-
-  if (!response.ok) {
-    // ST API returns 404 for not found — return null instead of throwing
-    if (response.status === 404) return null;
-    throw new Error(`ST API error: ${response.status}`);
-  }
-
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`ST API error: ${response.status}`);
   return await response.json();
+}
+
+// Generic safe ST entity fetch — handles 404 and errors uniformly
+async function stGetEntity(env: Env, path: string, label: string): Promise<any> {
+  try {
+    return await stGet(env, path);
+  } catch (err) {
+    console.error(`ST ${label} error:`, err);
+    return null;
+  }
 }
 
 export async function getTechnicianByPhoneFromST(env: Env, phone: string): Promise<any> {
   try {
-    const tenantId = '431848990';
-    // ST Technicians API returns paginated results, search through them
-    const data = await stGet(env, `/settings/v2/tenant/${tenantId}/technicians?pageSize=200`);
+    const data = await stGet(env, `/settings/v2/tenant/${TENANT_ID}/technicians?pageSize=200`);
     const technicians = data?.pageItems || [];
+    const normalized = normalizePhone(phone);
 
-    // Find tech by phone (may be stored with or without formatting)
-    const normalized = phone.replace(/\D/g, '').slice(-10); // Last 10 digits
     const tech = technicians.find((t: any) => {
-      const techPhone = (t.mobilePhone || t.phone || '').replace(/\D/g, '').slice(-10);
+      const techPhone = normalizePhone(t.mobilePhone || t.phone || '');
       return techPhone === normalized;
     });
 
-    if (tech) {
-      // Get tech's current job/appointment from Technicians API
-      const techDetail = await stGet(env, `/settings/v2/tenant/${tenantId}/technicians/${tech.id}`);
-      return techDetail || tech;
-    }
-
-    return null;
+    // Return matched tech directly — list endpoint has all needed fields.
+    // tech.jobId and tech.appoitmentId (sic) contain current dispatch state.
+    return tech || null;
   } catch (err) {
     console.error('ST tech lookup error:', err);
     return null;
   }
 }
 
-export async function getTechnicianAppointments(env: Env, technicianId: string): Promise<any[]> {
-  try {
-    const tenantId = '431848990';
-    const data = await stGet(env, `/dispatch/v2/tenant/${tenantId}/appointment-assignments?technicianId=${technicianId}`);
-    return data?.pageItems || [];
-  } catch (err) {
-    console.error('ST appointments error:', err);
-    return [];
-  }
+export function getTechnicianAppointments(env: Env, technicianId: string) {
+  return stGetEntity(env,
+    `/dispatch/v2/tenant/${TENANT_ID}/appointment-assignments?technicianId=${technicianId}`,
+    'appointments'
+  ).then(d => d?.pageItems || []);
 }
 
-export async function getCustomerFromST(env: Env, customerId: string): Promise<any> {
-  try {
-    const tenantId = '431848990';
-    return await stGet(env, `/crm/v2/tenant/${tenantId}/customers/${customerId}`);
-  } catch (err) {
-    console.error('ST customer error:', err);
-    return null;
-  }
+export function getCustomerFromST(env: Env, id: string) {
+  return stGetEntity(env, `/crm/v2/tenant/${TENANT_ID}/customers/${id}`, 'customer');
 }
 
-export async function getJobFromST(env: Env, jobId: string): Promise<any> {
-  try {
-    const tenantId = '431848990';
-    return await stGet(env, `/jpm/v2/tenant/${tenantId}/jobs/${jobId}`);
-  } catch (err) {
-    console.error('ST job error:', err);
-    return null;
-  }
+export function getJobFromST(env: Env, id: string) {
+  return stGetEntity(env, `/jpm/v2/tenant/${TENANT_ID}/jobs/${id}`, 'job');
 }
 
-export async function getLocationFromST(env: Env, locationId: string): Promise<any> {
-  try {
-    const tenantId = '431848990';
-    return await stGet(env, `/crm/v2/tenant/${tenantId}/locations/${locationId}`);
-  } catch (err) {
-    console.error('ST location error:', err);
-    return null;
-  }
+export function getLocationFromST(env: Env, id: string) {
+  return stGetEntity(env, `/crm/v2/tenant/${TENANT_ID}/locations/${id}`, 'location');
 }
 
-export async function getInvoiceFromST(env: Env, invoiceId: string): Promise<any> {
-  try {
-    const tenantId = '431848990';
-    return await stGet(env, `/accounting/v2/tenant/${tenantId}/invoices/${invoiceId}`);
-  } catch (err) {
-    console.error('ST invoice error:', err);
-    return null;
-  }
+export function getInvoiceFromST(env: Env, id: string) {
+  return stGetEntity(env, `/accounting/v2/tenant/${TENANT_ID}/invoices/${id}`, 'invoice');
 }
 
-export async function createSTTask(
-  env: Env,
-  taskData: {
-    name: string;
-    description?: string;
-    businessUnitId?: string;
-    assignedToId?: string;
-    jobId?: string;
-    customerId?: string;
-    type?: string;
-    source?: string;
-    priority?: string;
-  }
-): Promise<any> {
+export async function createSTTask(env: Env, taskData: {
+  name: string; description?: string; businessUnitId?: string; assignedToId?: string;
+  jobId?: string; customerId?: string; type?: string; source?: string; priority?: string;
+}): Promise<any> {
   try {
-    const tenantId = '431848990';
     const token = await getSTToken(env);
-
-    const body = {
-      name: taskData.name,
-      description: taskData.description || '',
-      businessUnitId: taskData.businessUnitId || '4921847', // HVAC Service default
-      assignedToId: taskData.assignedToId || '33327615', // Jessica Gale default
-      jobId: taskData.jobId || null,
-      customerId: taskData.customerId || null,
-      taskTypeId: taskData.type || '78250217', // Dispatch/Scheduling
-      taskSourceId: taskData.source || '78247908', // CIC
-      priority: taskData.priority || 'medium',
-    };
-
-    const response = await fetch(`https://api.servicetitan.io/taskmanagement/v2/tenant/${tenantId}/tasks`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw new Error(`ST task creation error: ${response.status}`);
-    }
-
+    const response = await fetch(
+      `https://api.servicetitan.io/taskmanagement/v2/tenant/${TENANT_ID}/tasks`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: taskData.name,
+          description: taskData.description || '',
+          businessUnitId: taskData.businessUnitId || '4921847',
+          assignedToId: taskData.assignedToId || '33327615',
+          jobId: taskData.jobId || null,
+          customerId: taskData.customerId || null,
+          taskTypeId: taskData.type || '78250217',
+          taskSourceId: taskData.source || '78247908',
+          priority: taskData.priority || 'medium',
+        }),
+      }
+    );
+    if (!response.ok) throw new Error(`ST task creation error: ${response.status}`);
     return await response.json();
   } catch (err) {
     console.error('ST create task error:', err);

@@ -26,34 +26,28 @@ export interface QuinnDebrief {
   created_at?: string;
 }
 
+export function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '').slice(-10);
+}
+
+export function jsonResponse(data: any, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 export async function saveDebrief(db: D1Database, debrief: QuinnDebrief): Promise<void> {
   const {
-    retell_call_id,
-    job_id,
-    customer_name,
-    technician,
-    technician_id,
-    date,
-    job_complete,
-    invoice_closed,
-    parts_used,
-    restock_needed,
-    returns_needed,
-    follow_up_type,
-    follow_up_timing,
-    follow_up_notes,
-    equipment_scanned,
-    equipment_missed,
-    property_notes,
-    recommendations_observed,
-    recommendations_presented,
-    membership_status,
-    coaching_flags,
-    escalation_flags,
-    additional_notes,
+    retell_call_id, job_id, customer_name, technician, technician_id,
+    date, job_complete, invoice_closed, parts_used, restock_needed,
+    returns_needed, follow_up_type, follow_up_timing, follow_up_notes,
+    equipment_scanned, equipment_missed, property_notes,
+    recommendations_observed, recommendations_presented, membership_status,
+    coaching_flags, escalation_flags, additional_notes,
   } = debrief;
 
-  const stmt = db.prepare(`
+  await db.prepare(`
     INSERT INTO quinn_debriefs (
       retell_call_id, job_id, customer_name, technician, technician_id,
       date, job_complete, invoice_closed, parts_used, restock_needed,
@@ -62,111 +56,81 @@ export async function saveDebrief(db: D1Database, debrief: QuinnDebrief): Promis
       recommendations_observed, recommendations_presented, membership_status,
       coaching_flags, escalation_flags, additional_notes, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-  `);
-
-  await stmt.bind(
-    retell_call_id,
-    job_id,
-    customer_name,
-    technician,
-    technician_id || null,
-    date,
-    job_complete ? 1 : 0,
-    invoice_closed ? 1 : 0,
-    parts_used || null,
-    restock_needed || null,
-    returns_needed || null,
-    follow_up_type || null,
-    follow_up_timing || null,
-    follow_up_notes || null,
-    equipment_scanned ? 1 : 0,
-    equipment_missed || null,
-    property_notes || null,
-    recommendations_observed || null,
-    recommendations_presented ? 1 : 0,
-    membership_status || null,
-    coaching_flags || null,
-    escalation_flags || null,
+  `).bind(
+    retell_call_id, job_id, customer_name, technician, technician_id || null,
+    date, job_complete ? 1 : 0, invoice_closed ? 1 : 0,
+    parts_used || null, restock_needed || null, returns_needed || null,
+    follow_up_type || null, follow_up_timing || null, follow_up_notes || null,
+    equipment_scanned ? 1 : 0, equipment_missed || null, property_notes || null,
+    recommendations_observed || null, recommendations_presented ? 1 : 0,
+    membership_status || null, coaching_flags || null, escalation_flags || null,
     additional_notes || null
   ).run();
 }
 
+async function safeFirst(db: D1Database, sql: string, ...params: any[]): Promise<any> {
+  try {
+    return await db.prepare(sql).bind(...params).first() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getTechnicianByPhone(db: D1Database, phone: string): Promise<any> {
-  try {
-    const normalized = normalizePhone(phone);
-    const stmt = db.prepare(`
-      SELECT tech_id as id, name, email, phone FROM technicians
-      WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '(', ''), ')', '') = ?
-      AND active = 1
-      LIMIT 1
-    `);
-    const result = await stmt.bind(normalized).first();
-    return result || null;
-  } catch (err) {
-    // Table doesn't exist or schema mismatch — fallback to ST API
-    return null;
-  }
+  const normalized = normalizePhone(phone);
+  return safeFirst(db,
+    `SELECT tech_id as id, name, email, phone FROM technicians
+     WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '(', ''), ')', '') = ?
+     AND active = 1 LIMIT 1`,
+    normalized
+  );
 }
 
-export async function getTechnicianById(db: D1Database, id: string): Promise<any> {
-  const stmt = db.prepare(`SELECT tech_id as id, name, email, phone FROM technicians WHERE tech_id = ? LIMIT 1`);
-  return await stmt.bind(id).first();
+export function getTechnicianById(db: D1Database, id: string) {
+  return safeFirst(db,
+    `SELECT tech_id as id, name, email, phone FROM technicians WHERE tech_id = ? LIMIT 1`, id);
 }
 
-export async function getCustomerById(db: D1Database, id: string): Promise<any> {
-  const stmt = db.prepare(`
-    SELECT customer_id as id, name, phone, email FROM customers WHERE customer_id = ? LIMIT 1
-  `);
-  return await stmt.bind(id).first();
+export function getCustomerById(db: D1Database, id: string) {
+  return safeFirst(db,
+    `SELECT customer_id as id, name, phone, email FROM customers WHERE customer_id = ? LIMIT 1`, id);
 }
 
-export async function getJobById(db: D1Database, id: string): Promise<any> {
-  try {
-    const stmt = db.prepare(`
-      SELECT j.job_id as id, j.*, jt.name as job_type_name
-      FROM jobs j
-      LEFT JOIN job_types jt ON j.job_type = jt.name
-      WHERE j.job_id = ? LIMIT 1
-    `);
-    return await stmt.bind(id).first();
-  } catch (err) {
-    // Table doesn't exist or schema mismatch — fallback to ST API
-    return null;
-  }
+export function getJobById(db: D1Database, id: string) {
+  return safeFirst(db,
+    `SELECT j.job_id as id, j.customer_name, j.location, j.job_type, j.job_status,
+            j.technician, j.scheduled_date, j.completed_date, j.revenue,
+            jt.name as job_type_name
+     FROM jobs j LEFT JOIN job_types jt ON j.job_type = jt.name
+     WHERE j.job_id = ? LIMIT 1`, id);
 }
 
-export async function getLocationById(db: D1Database, id: string): Promise<any> {
-  const stmt = db.prepare(`
-    SELECT location_id as id, name, address, city, state, zip, latitude, longitude
-    FROM locations WHERE location_id = ? LIMIT 1
-  `);
-  return await stmt.bind(id).first();
+export function getLocationById(db: D1Database, id: string) {
+  return safeFirst(db,
+    `SELECT location_id as id, name, address, city, state, zip, latitude, longitude
+     FROM locations WHERE location_id = ? LIMIT 1`, id);
 }
 
-export async function getInvoiceById(db: D1Database, id: string): Promise<any> {
-  const stmt = db.prepare(`
-    SELECT invoice_id as id, * FROM invoices WHERE invoice_id = ? LIMIT 1
-  `);
-  return await stmt.bind(id).first();
+export function getInvoiceById(db: D1Database, id: string) {
+  return safeFirst(db,
+    `SELECT invoice_id as id, invoice_number, job_id, customer_name, total, balance,
+            invoice_status, created_date, due_date
+     FROM invoices WHERE invoice_id = ? LIMIT 1`, id);
 }
 
 export async function getPricebookItem(db: D1Database, code?: string, name?: string): Promise<any> {
   if (code) {
-    const stmt = db.prepare(`
-      SELECT * FROM pricebook WHERE code = ? LIMIT 1
-    `);
-    return await stmt.bind(code).first();
+    return safeFirst(db, `SELECT * FROM pricebook WHERE code = ? LIMIT 1`, code);
   }
   if (name) {
-    const stmt = db.prepare(`
-      SELECT * FROM pricebook WHERE name LIKE ? LIMIT 5
-    `);
-    const results = await stmt.bind(`%${name}%`).all();
-    return results?.results?.[0] || null;
+    try {
+      const results = await db.prepare(
+        `SELECT * FROM pricebook WHERE name LIKE ? LIMIT 5`
+      ).bind(`%${name}%`).all();
+      return results?.results?.[0] || null;
+    } catch {
+      return null;
+    }
   }
   return null;
-}
-
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, '').slice(-10);
 }

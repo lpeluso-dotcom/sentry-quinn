@@ -1,73 +1,48 @@
 import { Env } from '../index';
-import { getTechnicianByPhone, getJobById } from '../utils/db';
+import { getTechnicianByPhone, getJobById, jsonResponse } from '../utils/db';
 import { getTechnicianByPhoneFromST, getJobFromST } from '../utils/st-api';
 
 export async function handleIdentifyTech(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as any;
-    const phone = body.phone;
-
-    if (!phone) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required field: phone' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    const body = (await req.json()) as { phone?: string };
+    if (!body.phone) {
+      return jsonResponse({ error: 'Missing required field: phone' }, 400);
     }
 
-    // Try D1 first
-    let tech = await getTechnicianByPhone(env.DB, phone);
-
-    // Fallback to ST API
+    // Try D1 first, fall back to ST API
+    let tech = await getTechnicianByPhone(env.DB, body.phone);
     if (!tech) {
-      tech = await getTechnicianByPhoneFromST(env, phone);
+      tech = await getTechnicianByPhoneFromST(env, body.phone);
     }
 
     if (!tech) {
-      return new Response(
-        JSON.stringify({
-          identified: false,
-          phone: phone,
-          message: 'Technician not found'
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ identified: false, phone: body.phone, message: 'Technician not found' });
     }
 
-    // Get tech's current job from their appointments
+    // Get current job — ST API returns jobId on the tech record when dispatched.
+    // D1 technicians table does NOT have current job info, so this only works via ST path.
     let current_job = null;
-    if (tech.current_job_id) {
-      // Try D1 first
-      current_job = await getJobById(env.DB, tech.current_job_id);
-
-      // Fallback to ST API
-      if (!current_job) {
-        current_job = await getJobFromST(env, tech.current_job_id);
-      }
+    const currentJobId = tech.jobId; // ST field name from technicians list/detail endpoint
+    if (currentJobId) {
+      current_job = await getJobById(env.DB, String(currentJobId))
+        || await getJobFromST(env, String(currentJobId));
     }
 
-    return new Response(
-      JSON.stringify({
-        identified: true,
-        technician_id: tech.id,
-        technician_name: tech.name,
-        phone: phone,
-        current_job: current_job ? {
-          job_id: current_job.id,
-          job_number: current_job.job_number,
-          customer_name: current_job.customer_name,
-          address: current_job.address,
-          job_type: current_job.job_type,
-          status: current_job.status,
-          campaign: current_job.campaign || null
-        } : null
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({
+      identified: true,
+      technician_id: tech.id,
+      technician_name: tech.name,
+      phone: body.phone,
+      current_job: current_job ? {
+        job_id: current_job.id || current_job.job_id,
+        customer_name: current_job.customer_name || current_job.customerName,
+        location: current_job.location || current_job.address,
+        job_type: current_job.job_type_name || current_job.job_type || current_job.jobType,
+        job_status: current_job.job_status || current_job.jobStatus,
+      } : null,
+    });
   } catch (err) {
     console.error('Identify tech handler error:', err);
-    return new Response(
-      JSON.stringify({ error: 'Internal error', details: (err as Error).message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ error: 'Internal error', details: (err as Error).message }, 500);
   }
 }
