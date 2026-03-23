@@ -36,7 +36,7 @@ export default {
 };
 
 router.get('/health', () => new Response(
-  JSON.stringify({ status: 'ok', service: 'sentry-quinn', version: '2.1.0', timestamp: new Date().toISOString() }),
+  JSON.stringify({ status: 'ok', service: 'sentry-quinn', version: '2.2.0', timestamp: new Date().toISOString() }),
   { status: 200, headers: { 'Content-Type': 'application/json' } }
 ));
 
