@@ -1,5 +1,4 @@
 name = "sentry-quinn"
-type = "service"
 account_id = "97e218899ffa1f434bc29cec8eec6c5a"
 workers_dev = true
 main = "src/index.ts"
@@ -9,6 +8,11 @@ compatibility_date = "2024-03-01"
 routes = [
   { pattern = "sentry-quinn.lpeluso.workers.dev/*", zone_name = "lpeluso.dev" }
 ]
+
+[vars]
+MAKE_WEBHOOK_TRANSCRIPT = "https://hook.us2.make.com/jww7ia2xa1ewqgwmcgqhbxcrlpacr2kn"
+ST_APP_KEY = "ak1.bwkvau9b5okjzxykjsu40r3od"
+ST_CLIENT_ID = "cid.eo3vcy5zs1ncsf2hczeyk1he8"
 
 [[d1_databases]]
 binding = "DB"
@@ -31,10 +35,4 @@ id = "4c18d1ac623145ab86901d5fb44a022a"
 binding = "CACHE"
 id = "12357ca7f0234cc3815dd9505cd02daa"
 
-[build]
-command = "npm install && tsc"
-cwd = "."
-main = "src/index.ts"
-
-[build.upload]
-format = "service-worker"
+# wrangler handles TS bundling natively — no custom build needed

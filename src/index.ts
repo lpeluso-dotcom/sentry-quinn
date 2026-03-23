@@ -13,6 +13,7 @@ import { handleEquipment } from './handlers/equipment';
 import { handleInvoice } from './handlers/invoice';
 import { handleEstimate } from './handlers/estimate';
 import { handleSyncCustomers } from './handlers/sync-customers';
+import { handleDigest } from './handlers/digest';
 
 const router = Router();
 
@@ -34,12 +35,10 @@ export default {
   },
 };
 
-router.get('/health', () => ({
-  status: 'ok',
-  service: 'sentry-quinn',
-  version: '2.0.0',
-  timestamp: new Date().toISOString(),
-}));
+router.get('/health', () => new Response(
+  JSON.stringify({ status: 'ok', service: 'sentry-quinn', version: '2.1.0', timestamp: new Date().toISOString() }),
+  { status: 200, headers: { 'Content-Type': 'application/json' } }
+));
 
 router.post('/api/quinn/identify-tech', (req, env) => handleIdentifyTech(req, env));
 router.post('/api/quinn/appointments', (req, env) => handleAppointments(req, env));
@@ -55,6 +54,7 @@ router.post('/api/quinn/save-debrief', (req, env) => handleSaveDebrief(req, env)
 router.post('/api/quinn/escalate', (req, env) => handleEscalate(req, env));
 router.post('/api/quinn/webhook', (req, env) => handleWebhook(req, env));
 router.post('/api/admin/sync-customers', (req, env) => handleSyncCustomers(req, env));
+router.get('/api/quinn/digest', (req, env) => handleDigest(req, env));
 
 router.all('*', () =>
   new Response(JSON.stringify({ error: 'Not found' }), {
