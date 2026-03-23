@@ -179,12 +179,28 @@ export async function searchCustomers(db: D1Database, query: string): Promise<an
       ).bind(`%${normalized}%`).all();
       if (results?.results?.length) return results.results;
     }
-    // Fuzzy name/address search
-    const results = await db.prepare(
+
+    // Try exact phrase match first
+    const exact = await db.prepare(
       `SELECT customer_id as id, name, phone, email, address, city, state, zip
        FROM customers WHERE name LIKE ? OR address LIKE ? LIMIT 5`
     ).bind(`%${query}%`, `%${query}%`).all();
-    return results?.results || [];
+    if (exact?.results?.length) return exact.results;
+
+    // Fuzzy: split into words, match each word individually (handles STT mishearing)
+    // "Seminar Bruin" → match customers where name contains "Seminar" OR "Bruin"
+    const words = query.split(/\s+/).filter(w => w.length >= 3);
+    if (words.length > 0) {
+      const conditions = words.map(() => 'LOWER(name) LIKE LOWER(?)').join(' OR ');
+      const params = words.map(w => `%${w}%`);
+      const fuzzy = await db.prepare(
+        `SELECT customer_id as id, name, phone, email, address, city, state, zip
+         FROM customers WHERE ${conditions} ORDER BY name LIMIT 5`
+      ).bind(...params).all();
+      return fuzzy?.results || [];
+    }
+
+    return [];
   } catch {
     return [];
   }
