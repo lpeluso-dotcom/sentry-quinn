@@ -1,6 +1,6 @@
 name = "sentry-quinn"
 type = "service"
-account_id = "8e26c4fb99bfe3f5f36cede6e1e75d1a"
+account_id = "97e218899ffa1f434bc29cec8eec6c5a"
 workers_dev = true
 main = "src/index.ts"
 compatibility_date = "2024-03-01"
