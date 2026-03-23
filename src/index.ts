@@ -7,6 +7,7 @@ import { handlePricebook } from './handlers/pricebook';
 import { handleSaveDebrief } from './handlers/save-debrief';
 import { handleEscalate } from './handlers/escalate';
 import { handleWebhook } from './handlers/webhook';
+import { handleIdentifyTech } from './handlers/identify-tech';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.get('/health', () => ({
 }));
 
 // Implemented handlers
+router.post('/api/quinn/identify-tech', (req, env) => handleIdentifyTech(req, env));
 router.post('/api/quinn/appointments', (req, env) => handleAppointments(req, env));
 router.post('/api/quinn/job', (req, env) => handleJob(req, env));
 router.post('/api/quinn/customer', (req, env) => handleCustomer(req, env));
@@ -47,12 +49,6 @@ router.post('/api/quinn/escalate', (req, env) => handleEscalate(req, env));
 router.post('/api/quinn/webhook', (req, env) => handleWebhook(req, env));
 
 // Placeholder for endpoints not yet in use
-router.post('/api/quinn/identify-tech', () =>
-  new Response(JSON.stringify({ error: 'Not implemented' }), {
-    status: 501,
-    headers: { 'Content-Type': 'application/json' },
-  })
-);
 router.post('/api/quinn/customer-search', () =>
   new Response(JSON.stringify({ error: 'Not implemented' }), {
     status: 501,

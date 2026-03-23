@@ -27,12 +27,11 @@ export async function handleJob(req: Request, env: Env): Promise<Response> {
     if (!job && (body.customer_name || body.address)) {
       const query = body.customer_name || body.address || '';
       const stmt = env.DB.prepare(`
-        SELECT j.*, c.name as customer_name, l.address, l.city, l.state
+        SELECT j.job_id as id, j.customer_name, j.location, j.job_type, j.job_status,
+               j.technician, j.scheduled_date, j.completed_date, j.revenue
         FROM jobs j
-        LEFT JOIN customers c ON j.customer_id = c.id
-        LEFT JOIN locations l ON j.location_id = l.id
-        WHERE (c.name LIKE ? OR l.address LIKE ?)
-        ORDER BY j.created_on DESC LIMIT 5
+        WHERE (j.customer_name LIKE ? OR j.location LIKE ?)
+        ORDER BY j.created_at DESC LIMIT 5
       `);
       const results = await stmt.bind(`%${query}%`, `%${query}%`).all();
       if (results?.results && results.results.length > 0) {
@@ -54,18 +53,15 @@ export async function handleJob(req: Request, env: Env): Promise<Response> {
       JSON.stringify({
         status: 'success',
         job: {
-          id: job.id,
-          job_number: job.jobNumber,
-          customer_id: job.customerId,
+          id: job.id || job.job_id,
           customer_name: job.customer_name,
-          location_id: job.locationId,
-          address: job.address,
-          city: job.city,
-          state: job.state,
-          job_type: job.job_type_name,
-          job_status: job.jobStatus,
-          completed_on: job.completedOn,
-          notes: job.notes || '',
+          location: job.location,
+          job_type: job.job_type_name || job.job_type,
+          job_status: job.job_status || job.jobStatus,
+          technician: job.technician,
+          scheduled_date: job.scheduled_date,
+          completed_date: job.completed_date || job.completedOn,
+          revenue: job.revenue,
         },
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }

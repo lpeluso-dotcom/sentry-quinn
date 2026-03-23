@@ -92,51 +92,60 @@ export async function saveDebrief(db: D1Database, debrief: QuinnDebrief): Promis
 }
 
 export async function getTechnicianByPhone(db: D1Database, phone: string): Promise<any> {
-  const normalized = normalizePhone(phone);
-  const stmt = db.prepare(`
-    SELECT id, name, email, phone FROM technicians
-    WHERE REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '(', '') = ?
-    LIMIT 1
-  `);
-  const result = await stmt.bind(normalized).first();
-  return result || null;
+  try {
+    const normalized = normalizePhone(phone);
+    const stmt = db.prepare(`
+      SELECT tech_id as id, name, email, phone FROM technicians
+      WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '(', ''), ')', '') = ?
+      AND active = 1
+      LIMIT 1
+    `);
+    const result = await stmt.bind(normalized).first();
+    return result || null;
+  } catch (err) {
+    // Table doesn't exist or schema mismatch — fallback to ST API
+    return null;
+  }
 }
 
 export async function getTechnicianById(db: D1Database, id: string): Promise<any> {
-  const stmt = db.prepare(`SELECT id, name, email, phone FROM technicians WHERE id = ? LIMIT 1`);
+  const stmt = db.prepare(`SELECT tech_id as id, name, email, phone FROM technicians WHERE tech_id = ? LIMIT 1`);
   return await stmt.bind(id).first();
 }
 
 export async function getCustomerById(db: D1Database, id: string): Promise<any> {
   const stmt = db.prepare(`
-    SELECT id, name, phone, email FROM customers WHERE id = ? LIMIT 1
+    SELECT customer_id as id, name, phone, email FROM customers WHERE customer_id = ? LIMIT 1
   `);
   return await stmt.bind(id).first();
 }
 
 export async function getJobById(db: D1Database, id: string): Promise<any> {
-  const stmt = db.prepare(`
-    SELECT j.*, c.name as customer_name, bt.name as business_unit_name, jt.name as job_type_name
-    FROM jobs j
-    LEFT JOIN customers c ON j.customer_id = c.id
-    LEFT JOIN business_units bt ON j.business_unit_id = bt.id
-    LEFT JOIN job_types jt ON j.job_type_id = jt.id
-    WHERE j.id = ? LIMIT 1
-  `);
-  return await stmt.bind(id).first();
+  try {
+    const stmt = db.prepare(`
+      SELECT j.job_id as id, j.*, jt.name as job_type_name
+      FROM jobs j
+      LEFT JOIN job_types jt ON j.job_type = jt.name
+      WHERE j.job_id = ? LIMIT 1
+    `);
+    return await stmt.bind(id).first();
+  } catch (err) {
+    // Table doesn't exist or schema mismatch — fallback to ST API
+    return null;
+  }
 }
 
 export async function getLocationById(db: D1Database, id: string): Promise<any> {
   const stmt = db.prepare(`
-    SELECT id, name, address, city, state, zip, access_notes, latitude, longitude
-    FROM locations WHERE id = ? LIMIT 1
+    SELECT location_id as id, name, address, city, state, zip, latitude, longitude
+    FROM locations WHERE location_id = ? LIMIT 1
   `);
   return await stmt.bind(id).first();
 }
 
 export async function getInvoiceById(db: D1Database, id: string): Promise<any> {
   const stmt = db.prepare(`
-    SELECT * FROM invoices WHERE id = ? LIMIT 1
+    SELECT invoice_id as id, * FROM invoices WHERE invoice_id = ? LIMIT 1
   `);
   return await stmt.bind(id).first();
 }

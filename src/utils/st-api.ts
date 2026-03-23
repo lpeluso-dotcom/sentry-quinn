@@ -65,6 +65,33 @@ export async function stGet(env: Env, path: string): Promise<any> {
   return await response.json();
 }
 
+export async function getTechnicianByPhoneFromST(env: Env, phone: string): Promise<any> {
+  try {
+    const tenantId = '431848990';
+    // ST Technicians API returns paginated results, search through them
+    const data = await stGet(env, `/settings/v2/tenant/${tenantId}/technicians?pageSize=200`);
+    const technicians = data?.pageItems || [];
+
+    // Find tech by phone (may be stored with or without formatting)
+    const normalized = phone.replace(/\D/g, '').slice(-10); // Last 10 digits
+    const tech = technicians.find((t: any) => {
+      const techPhone = (t.mobilePhone || t.phone || '').replace(/\D/g, '').slice(-10);
+      return techPhone === normalized;
+    });
+
+    if (tech) {
+      // Get tech's current job/appointment from Technicians API
+      const techDetail = await stGet(env, `/settings/v2/tenant/${tenantId}/technicians/${tech.id}`);
+      return techDetail || tech;
+    }
+
+    return null;
+  } catch (err) {
+    console.error('ST tech lookup error:', err);
+    return null;
+  }
+}
+
 export async function getTechnicianAppointments(env: Env, technicianId: string): Promise<any[]> {
   try {
     const tenantId = '431848990';
