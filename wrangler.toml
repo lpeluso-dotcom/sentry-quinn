@@ -23,10 +23,11 @@ id = "4c18d1ac623145ab86901d5fb44a022a"
 binding = "CACHE"
 id = "12357ca7f0234cc3815dd9505cd02daa"
 
-[env.production.kv_namespaces]
+[[env.production.kv_namespaces]]
 binding = "STATE"
 id = "4c18d1ac623145ab86901d5fb44a022a"
 
+[[env.production.kv_namespaces]]
 binding = "CACHE"
 id = "12357ca7f0234cc3815dd9505cd02daa"
 
