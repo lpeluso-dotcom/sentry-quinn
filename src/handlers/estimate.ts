@@ -10,7 +10,7 @@ export async function handleEstimate(req: Request, env: Env): Promise<Response> 
 
     const estimates = await searchEstimates(env.DB, body);
     if (!estimates.length) {
-      return jsonResponse({ status: 'not_found', message: 'No estimates found' }, 404);
+      return jsonResponse({ status: 'not_found', message: 'No estimates found' }, 200);
     }
 
     return jsonResponse({

@@ -10,7 +10,7 @@ export async function handleInvoice(req: Request, env: Env): Promise<Response> {
 
     const invoices = await searchInvoices(env.DB, body);
     if (!invoices.length) {
-      return jsonResponse({ status: 'not_found', message: 'No invoices found' }, 404);
+      return jsonResponse({ status: 'not_found', message: 'No invoices found' }, 200);
     }
 
     return jsonResponse({

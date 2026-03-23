@@ -10,7 +10,7 @@ export async function handlePricebook(req: Request, env: Env): Promise<Response>
 
     const items = await searchPricebook(env.DB, body.code, body.name);
     if (!items.length) {
-      return jsonResponse({ status: 'not_found', message: 'Item not found in pricebook' }, 404);
+      return jsonResponse({ status: 'not_found', message: 'Item not found in pricebook' }, 200);
     }
 
     return jsonResponse({

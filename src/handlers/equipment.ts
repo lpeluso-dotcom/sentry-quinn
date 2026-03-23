@@ -43,7 +43,7 @@ export async function handleEquipment(req: Request, env: Env): Promise<Response>
       }
 
       if (!items.length) {
-        return jsonResponse({ status: 'not_found', message: 'No equipment found matching that search' }, 404);
+        return jsonResponse({ status: 'not_found', message: 'No equipment found matching that search' }, 200);
       }
 
       return jsonResponse({

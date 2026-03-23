@@ -34,7 +34,7 @@ export async function handleJob(req: Request, env: Env): Promise<Response> {
     }
 
     if (!job) {
-      return jsonResponse({ error: 'Job not found' }, 404);
+      return jsonResponse({ error: 'Job not found' }, 200);
     }
 
     return jsonResponse({

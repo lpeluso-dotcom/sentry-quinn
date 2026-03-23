@@ -11,7 +11,7 @@ export async function handleCustomerSearch(req: Request, env: Env): Promise<Resp
 
     const customers = await searchCustomers(env.DB, query);
     if (!customers.length) {
-      return jsonResponse({ status: 'not_found', message: 'No customers found' }, 404);
+      return jsonResponse({ status: 'not_found', message: 'No customers found' }, 200);
     }
 
     return jsonResponse({
