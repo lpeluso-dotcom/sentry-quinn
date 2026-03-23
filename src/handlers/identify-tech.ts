@@ -18,7 +18,8 @@ async function findTechByName(db: D1Database, name: string): Promise<any> {
 
 export async function handleIdentifyTech(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as { phone?: string; name?: string };
+    const body = (await req.json()) as Record<string, any>;
+    const techName = body.technician_name || body.name;
 
     let tech: any = null;
 
@@ -31,8 +32,8 @@ export async function handleIdentifyTech(req: Request, env: Env): Promise<Respon
     }
 
     // Fall back to name search
-    if (!tech && body.name) {
-      tech = await findTechByName(env.DB, body.name);
+    if (!tech && techName) {
+      tech = await findTechByName(env.DB, techName);
     }
 
     if (!tech) {

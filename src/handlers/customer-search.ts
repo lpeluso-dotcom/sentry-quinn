@@ -3,8 +3,8 @@ import { searchCustomers, jsonResponse } from '../utils/db';
 
 export async function handleCustomerSearch(req: Request, env: Env): Promise<Response> {
   try {
-    const body = (await req.json()) as { name?: string; phone?: string; customer_id?: string };
-    const query = body.name || body.phone || body.customer_id || '';
+    const body = (await req.json()) as Record<string, any>;
+    const query = body.customer_name || body.name || body.phone || body.customer_id || '';
     if (!query) {
       return jsonResponse({ error: 'Missing name, phone, or customer_id' }, 400);
     }
