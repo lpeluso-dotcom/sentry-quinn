@@ -148,7 +148,16 @@ async function pollTechStatus(env: Env, techId: number, techName: string, today:
 
   // Step 3: Priority resolution
   const current = working || dispatched || null;
-  const dispatchStatus = working ? 'Working' : dispatched ? 'Dispatched' : nextScheduled ? 'Scheduled' : 'Done';
+  let dispatchStatus: string;
+  if (working) {
+    dispatchStatus = 'Working';
+  } else if (dispatched) {
+    dispatchStatus = 'Dispatched';
+  } else if (nextScheduled) {
+    dispatchStatus = 'Scheduled';
+  } else {
+    dispatchStatus = 'Done';
+  }
 
   // Step 4: Enrich current job
   let currentJob: any = null;
@@ -163,34 +172,42 @@ async function pollTechStatus(env: Env, techId: number, techName: string, today:
     currentJobType = currentJob?.jobType;
   }
 
-  // Step 5: Enrich next job
+  // Step 5: Enrich next job (and fall back to nextScheduled for current if no working/dispatched)
   let nextCustomer: string | null = null;
   let nextAddress: string | null = null;
-  const nextAppt = current ? nextScheduled : nextScheduled;
 
-  if (nextAppt && nextAppt !== current) {
-    const nextJob = await enrichJob(env, nextAppt.appointment.jobId, nextAppt.appointment.customerId);
+  if (nextScheduled && nextScheduled !== current) {
+    const nextJob = await enrichJob(env, nextScheduled.appointment.jobId, nextScheduled.appointment.customerId);
     nextCustomer = nextJob?.customerName;
     nextAddress = nextJob?.address;
+  }
+
+  // When no working/dispatched job, fall back to nextScheduled for current fields
+  const effectiveCurrent = current || nextScheduled;
+
+  // If we had no currentCustomer but fell back to nextScheduled, enrich it
+  if (!currentCustomer && !current && nextScheduled) {
+    const fallbackJob = await enrichJob(env, nextScheduled.appointment.jobId, nextScheduled.appointment.customerId);
+    currentCustomer = fallbackJob?.customerName || null;
   }
 
   return {
     technician_id: techId,
     technician_name: techName,
     dispatch_status: dispatchStatus,
-    current_job_id: current?.appointment.jobId || nextScheduled?.appointment.jobId || null,
-    current_job_number: String(current?.appointment.jobId || nextScheduled?.appointment.jobId || ''),
-    current_customer: currentCustomer || (nextScheduled ? (await enrichJob(env, nextScheduled.appointment.jobId, nextScheduled.appointment.customerId))?.customerName : null),
-    current_address: currentAddress || null,
-    current_job_type: currentJobType || null,
-    current_appointment_id: current?.appointment.id || nextScheduled?.appointment.id || null,
-    current_appointment_start: current?.appointment.start || nextScheduled?.appointment.start || null,
-    current_appointment_end: current?.appointment.end || nextScheduled?.appointment.end || null,
-    next_job_id: nextAppt?.appointment.jobId || null,
-    next_job_number: nextAppt ? String(nextAppt.appointment.jobId) : null,
+    current_job_id: effectiveCurrent?.appointment.jobId || null,
+    current_job_number: effectiveCurrent ? String(effectiveCurrent.appointment.jobId) : '',
+    current_customer: currentCustomer,
+    current_address: currentAddress,
+    current_job_type: currentJobType,
+    current_appointment_id: effectiveCurrent?.appointment.id || null,
+    current_appointment_start: effectiveCurrent?.appointment.start || null,
+    current_appointment_end: effectiveCurrent?.appointment.end || null,
+    next_job_id: nextScheduled?.appointment.jobId || null,
+    next_job_number: nextScheduled ? String(nextScheduled.appointment.jobId) : null,
     next_customer: nextCustomer,
     next_address: nextAddress,
-    next_start_time: nextAppt?.appointment.start || null,
+    next_start_time: nextScheduled?.appointment.start || null,
   };
 }
 

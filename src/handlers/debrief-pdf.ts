@@ -1,40 +1,12 @@
 import { Env } from '../index';
+import { jsonResponse, normalizePhone } from '../utils/db';
 
-// Minimal PDF generator — no dependencies, pure PDF spec
-// Generates a clean debrief report with headers, sections, and transcript
-
-const PHONE_MAP: Record<string, { name: string; st_id: number }> = {
-  '8542166525': { name: 'Brooks Hunsucker', st_id: 75766687 },
-  '8434726811': { name: 'Clyde Padgett', st_id: 33277431 },
-  '8542166525': { name: 'Josh Bass', st_id: 44127203 },
-  '8434095657': { name: 'Unknown Plumber', st_id: 0 },
+const PHONE_TO_TECH: Record<string, string> = {
+  '8542166525': 'Josh Bass',
+  '8434726811': 'Clyde Padgett',
+  '8434963573': 'Brooks Hunsucker',
+  '8434095657': 'Unknown Plumber',
 };
-
-interface DebriefData {
-  call_id: number;
-  technician: string;
-  customer_name: string;
-  job_id?: string;
-  date: string;
-  duration: string;
-  call_type: string;
-  campaign_name: string;
-  transcript: string;
-  from_number: string;
-  // Debrief fields
-  job_complete?: boolean;
-  invoice_closed?: boolean;
-  parts_used?: string;
-  restock_needed?: string;
-  follow_up_type?: string;
-  follow_up_notes?: string;
-  equipment_scanned?: boolean;
-  property_notes?: string;
-  recommendations_observed?: string;
-  membership_status?: string;
-  coaching_flags?: string;
-  escalation_flags?: string;
-}
 
 export async function handleDebriefPdf(request: Request, env: Env): Promise<Response> {
   try {
@@ -42,7 +14,7 @@ export async function handleDebriefPdf(request: Request, env: Env): Promise<Resp
     const callId = body.call_id || body.args?.call_id;
 
     if (!callId) {
-      return json({ error: 'call_id required' }, 400);
+      return jsonResponse({ error: 'call_id required' }, 400);
     }
 
     // Fetch call data from D1
@@ -54,7 +26,7 @@ export async function handleDebriefPdf(request: Request, env: Env): Promise<Resp
     `).bind(callId).first();
 
     if (!call) {
-      return json({ error: 'Call not found', call_id: callId }, 404);
+      return jsonResponse({ error: 'Call not found', call_id: callId }, 404);
     }
 
     // Fetch debrief if exists
@@ -62,13 +34,8 @@ export async function handleDebriefPdf(request: Request, env: Env): Promise<Resp
       SELECT * FROM quinn_debriefs WHERE call_id = ? OR retell_call_id = ?
     `).bind(callId, String(callId)).first().catch(() => null);
 
-    // Resolve technician
-    const phone = String(call.from_number || '').replace(/\D/g, '').slice(-10);
-    let techName = 'Unknown';
-    if (phone === '8542166525') techName = 'Josh Bass';
-    else if (phone === '8434726811') techName = 'Clyde Padgett';
-    else if (phone === '8434963573') techName = 'Brooks Hunsucker';
-    else if (phone === '8434095657') techName = 'Unknown Plumber';
+    const phone = normalizePhone(String(call.from_number || ''));
+    const techName = PHONE_TO_TECH[phone] || 'Unknown';
 
     // Format date
     const callDate = new Date(call.created_at as string);
@@ -151,7 +118,7 @@ export async function handleDebriefPdf(request: Request, env: Env): Promise<Resp
     // Mark as PDF generated in KV (prevents duplicates)
     await env.STATE.put(`pdf:${callId}`, new Date().toISOString(), { expirationTtl: 86400 * 30 });
 
-    return json({
+    return jsonResponse({
       status: 'ok',
       call_id: callId,
       technician: techName,
@@ -162,15 +129,8 @@ export async function handleDebriefPdf(request: Request, env: Env): Promise<Resp
       filename: `${callDate.toISOString().slice(0, 10)} - ${techName} - ${call.customer_name || 'Debrief'}.pdf`,
     });
   } catch (err: any) {
-    return json({ error: err.message }, 500);
+    return jsonResponse({ error: err.message }, 500);
   }
-}
-
-function json(data: any, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-  });
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {

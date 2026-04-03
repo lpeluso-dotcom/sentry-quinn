@@ -1,6 +1,6 @@
 import { Env } from '../index';
 import { extractArgs } from '../utils/retell';
-import { jsonResponse, getTechnicianByPhone } from '../utils/db';
+import { jsonResponse, getTechnicianByPhone, getJobById } from '../utils/db';
 import { getTechnicianByPhoneFromST, getTechnicianAppointments, getJobFromST } from '../utils/st-api';
 
 async function findTechByName(db: D1Database, name: string) {
@@ -9,20 +9,9 @@ async function findTechByName(db: D1Database, name: string) {
   ).bind(name).first();
   if (exact) return exact;
 
-  const partial = await db.prepare(
+  return db.prepare(
     `SELECT tech_id as id, name, email, phone FROM technicians WHERE LOWER(name) LIKE LOWER(?) AND active = 1 LIMIT 1`
   ).bind(`%${name}%`).first();
-  return partial;
-}
-
-async function getJobById(db: D1Database, id: string) {
-  return db.prepare(
-    `SELECT j.job_id as id, j.customer_name, j.location, j.job_type, j.job_status,
-            j.technician, j.scheduled_date, j.completed_date, j.revenue,
-            jt.name as job_type_name
-     FROM jobs j LEFT JOIN job_types jt ON j.job_type = jt.name
-     WHERE j.job_id = ? LIMIT 1`
-  ).bind(id).first();
 }
 
 /**
@@ -75,7 +64,7 @@ async function findCurrentJob(env: Env, techId: string) {
   }
 }
 
-export async function handleIdentifyTech(req: Request, env: Env) {
+export async function handleIdentifyTech(req: Request, env: Env): Promise<Response> {
   try {
     const rawBody = await req.json() as any;
     const body = extractArgs(rawBody);
@@ -104,10 +93,8 @@ export async function handleIdentifyTech(req: Request, env: Env) {
       });
     }
 
-    // Primary: real-time ST appointment lookup
     const current_job = await findCurrentJob(env, String(tech.id));
 
-    // Enrichment: dispatch status cache (optional, from cron poll)
     let dispatch_status: string | null = null;
     let next_job = null;
     try {
@@ -127,7 +114,6 @@ export async function handleIdentifyTech(req: Request, env: Env) {
       }
     } catch { /* dispatch cache is optional */ }
 
-    // Coaching profile (Siro-derived, subtle hints for Dawn)
     let coaching_hints: string[] = [];
     let coaching_focus: string | null = null;
     try {
@@ -138,7 +124,7 @@ export async function handleIdentifyTech(req: Request, env: Env) {
         coaching_hints = JSON.parse(profile.dawn_hints || '[]');
         coaching_focus = profile.coaching_focus;
       }
-    } catch { /* coaching profile is optional — never fail the call */ }
+    } catch { /* coaching profile is optional */ }
 
     return jsonResponse({
       identified: true,
