@@ -48,26 +48,77 @@ export async function handleIdentifyTech(req: Request, env: Env): Promise<Respon
       });
     }
 
-    // Get current job
+    // Get current job from dispatch status cache (polled from ST every few minutes)
     let current_job = null;
-    const currentJobId = tech.jobId;
-    if (currentJobId) {
-      current_job = await getJobById(env.DB, String(currentJobId))
-        || await getJobFromST(env, String(currentJobId));
+    let dispatch_status: string | null = null;
+    let next_job = null;
+
+    try {
+      const status = await env.DB.prepare(
+        `SELECT * FROM tech_current_status WHERE technician_id = ?`
+      ).bind(tech.id).first() as any;
+
+      if (status && status.current_job_id) {
+        dispatch_status = status.dispatch_status;
+        current_job = {
+          job_id: status.current_job_id,
+          job_number: status.current_job_number,
+          customer_name: status.current_customer,
+          location: status.current_address,
+          job_type: status.current_job_type,
+          job_status: status.dispatch_status,
+          appointment_start: status.current_appointment_start,
+          appointment_end: status.current_appointment_end,
+        };
+        if (status.next_job_id && status.next_job_id !== status.current_job_id) {
+          next_job = {
+            job_id: status.next_job_id,
+            customer_name: status.next_customer,
+            location: status.next_address,
+            start_time: status.next_start_time,
+          };
+        }
+      }
+    } catch { /* status cache is optional — fall back to legacy lookup */ }
+
+    // Legacy fallback: if no cached status, try the old approach
+    if (!current_job && tech.jobId) {
+      const legacyJob = await getJobById(env.DB, String(tech.jobId))
+        || await getJobFromST(env, String(tech.jobId));
+      if (legacyJob) {
+        current_job = {
+          job_id: legacyJob.id || legacyJob.job_id,
+          customer_name: legacyJob.customer_name || legacyJob.customerName,
+          location: legacyJob.location || legacyJob.address,
+          job_type: legacyJob.job_type_name || legacyJob.job_type || legacyJob.jobType,
+          job_status: legacyJob.job_status || legacyJob.jobStatus,
+        };
+      }
     }
+
+    // Get coaching profile (Siro-derived, subtle hints for Dawn)
+    let coaching_hints: string[] = [];
+    let coaching_focus: string | null = null;
+    try {
+      const profile = await env.DB.prepare(
+        `SELECT dawn_hints, coaching_focus, win_rate, top_strengths FROM tech_coaching_profiles WHERE technician_id = ?`
+      ).bind(tech.id).first() as any;
+      if (profile) {
+        coaching_hints = JSON.parse(profile.dawn_hints || '[]');
+        coaching_focus = profile.coaching_focus;
+      }
+    } catch { /* coaching profile is optional — never fail the call */ }
 
     return jsonResponse({
       identified: true,
       technician_id: tech.id,
       technician_name: tech.name,
       phone: tech.phone || body.phone,
-      current_job: current_job ? {
-        job_id: current_job.id || current_job.job_id,
-        customer_name: current_job.customer_name || current_job.customerName,
-        location: current_job.location || current_job.address,
-        job_type: current_job.job_type_name || current_job.job_type || current_job.jobType,
-        job_status: current_job.job_status || current_job.jobStatus,
-      } : null,
+      dispatch_status,
+      current_job,
+      next_job,
+      coaching_hints,
+      coaching_focus,
     });
   } catch (err) {
     console.error('Identify tech handler error:', err);

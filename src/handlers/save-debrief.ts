@@ -8,16 +8,19 @@ export async function handleSaveDebrief(req: Request, env: Env): Promise<Respons
     const rawBody = (await req.json()) as Record<string, any>;
     const body = extractArgs(rawBody) as any;
 
-    if (!body.job_id || !body.technician) {
+    // technician is required; job_id is optional (tech may not have a matched job)
+    if (!body.technician) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: job_id, technician' }),
+        JSON.stringify({ error: 'Missing required field: technician' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('[SaveDebrief] technician:', body.technician, '| job_id:', body.job_id || 'none', '| keys:', Object.keys(body).join(','));
+
     const debrief: QuinnDebrief = {
       retell_call_id: body.retell_call_id || '',
-      job_id: body.job_id,
+      job_id: body.job_id || '',
       customer_name: body.customer_name || '',
       technician: body.technician,
       technician_id: body.technician_id,

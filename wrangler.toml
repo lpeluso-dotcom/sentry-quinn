@@ -4,6 +4,9 @@ workers_dev = true
 main = "src/index.ts"
 compatibility_date = "2024-03-01"
 
+[observability]
+enabled = true
+
 [env.production]
 routes = [
   { pattern = "sentry-quinn.lpeluso.workers.dev/*", zone_name = "lpeluso.dev" }
@@ -34,5 +37,9 @@ id = "4c18d1ac623145ab86901d5fb44a022a"
 [[env.production.kv_namespaces]]
 binding = "CACHE"
 id = "12357ca7f0234cc3815dd9505cd02daa"
+
+# Cron triggers — dispatch status polling
+[triggers]
+crons = ["*/30 * * * *"]
 
 # wrangler handles TS bundling natively — no custom build needed

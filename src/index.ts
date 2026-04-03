@@ -14,6 +14,9 @@ import { handleInvoice } from './handlers/invoice';
 import { handleEstimate } from './handlers/estimate';
 import { handleSyncCustomers } from './handlers/sync-customers';
 import { handleDigest } from './handlers/digest';
+import { handleDispatchPoll } from './handlers/dispatch-poll';
+import { handleDebriefPdf } from './handlers/debrief-pdf';
+import { handleRecentDebriefs } from './handlers/recent-debriefs';
 
 const router = Router();
 
@@ -33,7 +36,26 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     return router.handle(request, env, ctx);
   },
+
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // Every 5 minutes: poll ST dispatch API for tech status
+    ctx.waitUntil(pollDispatchStatus(env));
+  },
 };
+
+async function pollDispatchStatus(env: Env) {
+  try {
+    const { handleDispatchPoll } = await import('./handlers/dispatch-poll');
+    const fakeReq = new Request('https://sentry-quinn.lpeluso.workers.dev/api/admin/poll-dispatch', {
+      method: 'POST',
+      headers: { 'x-admin-key': 'quinn-sync-2026' },
+    });
+    await handleDispatchPoll(fakeReq, env);
+    console.log('Dispatch poll completed via cron');
+  } catch (err) {
+    console.error('Dispatch poll cron error:', err);
+  }
+}
 
 router.get('/health', () => new Response(
   JSON.stringify({ status: 'ok', service: 'sentry-quinn', version: '2.1.0', timestamp: new Date().toISOString() }),
@@ -54,7 +76,10 @@ router.post('/api/quinn/save-debrief', (req, env) => handleSaveDebrief(req, env)
 router.post('/api/quinn/escalate', (req, env) => handleEscalate(req, env));
 router.post('/api/quinn/webhook', (req, env) => handleWebhook(req, env));
 router.post('/api/admin/sync-customers', (req, env) => handleSyncCustomers(req, env));
+router.post('/api/admin/poll-dispatch', (req, env) => handleDispatchPoll(req, env));
 router.get('/api/quinn/digest', (req, env) => handleDigest(req, env));
+router.post('/api/quinn/debrief-pdf', (req, env) => handleDebriefPdf(req, env));
+router.get('/api/quinn/recent-debriefs', (req, env) => handleRecentDebriefs(req, env));
 
 router.all('*', () =>
   new Response(JSON.stringify({ error: 'Not found' }), {
