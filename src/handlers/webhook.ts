@@ -51,25 +51,34 @@ async function handleCallInbound(env: Env, body: any): Promise<Response> {
 
 async function saveCallRecord(env: Env, body: any, callId: string): Promise<void> {
   console.log(`[CallEnded] ${callId}, duration: ${body.duration_ms || 0}ms`);
+  const transcript =
+    typeof body.transcript === 'string'
+      ? body.transcript
+      : body.transcript_object
+      ? JSON.stringify(body.transcript_object)
+      : '';
   try {
     await env.DB.prepare(`
       INSERT OR REPLACE INTO retell_calls (
-        retell_call_id, caller_phone, caller_name, caller_id,
-        call_duration_ms, call_status, disconnect_reason,
-        call_category, trade_identified, customer_sentiment,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        call_id, agent_id, from_number, to_number, direction, duration_ms,
+        call_category, trade_identified, appointment_booked, customer_sentiment,
+        call_summary, transcript, started_at, ended_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).bind(
       callId,
+      body.agent_id || '',
       body.from_number || '',
-      body.metadata?.caller_name || body.retell_llm_dynamic_variables?.caller_name || '',
-      body.metadata?.caller_id || body.retell_llm_dynamic_variables?.caller_id || '',
+      body.to_number || '',
+      body.direction || 'inbound',
       body.duration_ms || 0,
-      body.call_status || 'completed',
-      body.disconnect_reason || '',
       body.call_analysis?.call_summary ? 'debrief' : '',
       body.call_analysis?.custom_analysis_data?.trade || '',
+      body.call_analysis?.custom_analysis_data?.appointment_booked ? 1 : 0,
       body.call_analysis?.user_sentiment || '',
+      body.call_analysis?.call_summary || '',
+      transcript,
+      body.start_timestamp ? String(body.start_timestamp) : '',
+      body.end_timestamp ? String(body.end_timestamp) : '',
     ).run();
     console.log(`[CallEnded] Saved to retell_calls`);
   } catch (dbErr) {
@@ -86,7 +95,7 @@ async function updateCallAnalytics(env: Env, body: any, callId: string): Promise
         call_category = COALESCE(NULLIF(?, ''), call_category),
         trade_identified = COALESCE(NULLIF(?, ''), trade_identified),
         customer_sentiment = COALESCE(NULLIF(?, ''), customer_sentiment)
-      WHERE retell_call_id = ?
+      WHERE call_id = ?
     `).bind(
       analysis.call_summary ? 'debrief' : (analysis.custom_analysis_data?.category || ''),
       analysis.custom_analysis_data?.trade || '',
