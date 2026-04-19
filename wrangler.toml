@@ -12,10 +12,6 @@ routes = [
   { pattern = "sentry-quinn.lpeluso.workers.dev/*", zone_name = "lpeluso.dev" }
 ]
 
-[vars]
-MAKE_WEBHOOK_TRANSCRIPT = "https://hook.us2.make.com/jww7ia2xa1ewqgwmcgqhbxcrlpacr2kn"
-ST_APP_KEY = "ak1.bwkvau9b5okjzxykjsu40r3od"
-ST_CLIENT_ID = "cid.eo3vcy5zs1ncsf2hczeyk1he8"
 
 [[d1_databases]]
 binding = "DB"

@@ -25,7 +25,7 @@ export async function handleSyncCustomers(request: Request, env: Env): Promise<R
       const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'ST-App-Key': env.ST_APP_KEY || 'ak1.bwkvau9b5okjzxykjsu40r3od',
+          'ST-App-Key': env.ST_APP_KEY!,
         },
       });
 
@@ -81,7 +81,7 @@ export async function handleSyncCustomers(request: Request, env: Env): Promise<R
       const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'ST-App-Key': env.ST_APP_KEY || 'ak1.bwkvau9b5okjzxykjsu40r3od',
+          'ST-App-Key': env.ST_APP_KEY!,
         },
       });
       if (!res.ok) break;
