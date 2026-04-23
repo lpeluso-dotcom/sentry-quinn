@@ -31,8 +31,8 @@ export async function handleDebriefPdf(request: Request, env: Env): Promise<Resp
 
     // Fetch debrief if exists
     const debrief = await env.DB.prepare(`
-      SELECT * FROM quinn_debriefs WHERE call_id = ? OR retell_call_id = ?
-    `).bind(callId, String(callId)).first().catch(() => null);
+      SELECT * FROM quinn_debriefs WHERE retell_call_id = ?
+    `).bind(callId).first().catch(() => null);
 
     const phone = normalizePhone(String(call.from_number || ''));
     const techName = PHONE_TO_TECH[phone] || 'Unknown';
@@ -301,7 +301,7 @@ function generatePdf(title: string, subtitle: string, sections: { title: string;
   pdf += `${xrefOffset}\n`;
   pdf += '%%EOF\n';
 
-  return enc.encode(pdf).buffer;
+  return enc.encode(pdf).buffer as ArrayBuffer;
 }
 
 function wordWrap(text: string, maxChars: number): string[] {

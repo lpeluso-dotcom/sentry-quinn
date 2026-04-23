@@ -12,17 +12,18 @@ export async function handleSaveDebrief(req: Request, env: Env): Promise<Respons
     const rawBody = (await req.json()) as Record<string, any>;
     const body = extractArgs(rawBody) as any;
 
-    if (!body.technician) {
-      return jsonResponse({ error: 'Missing required field: technician' }, 400);
+    const techName = body.technician || body.technician_name || body.caller_name;
+    if (!techName) {
+      return jsonResponse({ error: 'Missing required field: technician / technician_name / caller_name' }, 400);
     }
 
-    console.log('[SaveDebrief] technician:', body.technician, '| job_id:', body.job_id || 'none', '| keys:', Object.keys(body).join(','));
+    console.log('[SaveDebrief] technician:', techName, '| job_id:', body.job_id || 'none', '| keys:', Object.keys(body).join(','));
 
     const debrief: QuinnDebrief = {
       retell_call_id: body.retell_call_id || '',
       job_id: body.job_id || '',
       customer_name: body.customer_name || '',
-      technician: body.technician,
+      technician: techName,
       technician_id: body.technician_id,
       debrief_date: body.date || new Date().toISOString().split('T')[0],
       job_complete: body.job_complete || false,
@@ -60,7 +61,7 @@ export async function handleSaveDebrief(req: Request, env: Env): Promise<Respons
       status: 'success',
       message: 'Debrief saved and webhook fired',
       job_id: body.job_id,
-      technician: body.technician,
+      technician: techName,
       webhook_sent: webhookResult,
     }, 201);
   } catch (err) {
