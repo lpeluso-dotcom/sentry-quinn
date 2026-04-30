@@ -17,6 +17,7 @@ import { handleDigest } from './handlers/digest';
 import { handleDispatchPoll } from './handlers/dispatch-poll';
 import { handleDebriefPdf } from './handlers/debrief-pdf';
 import { handleRecentDebriefs } from './handlers/recent-debriefs';
+import { handleCapacityLookup } from './handlers/capacity-lookup';
 
 const router = Router();
 
@@ -80,6 +81,7 @@ router.post('/api/admin/poll-dispatch', (req, env) => handleDispatchPoll(req, en
 router.get('/api/quinn/digest', (req, env) => handleDigest(req, env));
 router.post('/api/quinn/debrief-pdf', (req, env) => handleDebriefPdf(req, env));
 router.get('/api/quinn/recent-debriefs', (req, env) => handleRecentDebriefs(req, env));
+router.post('/api/quinn/capacity-lookup', (req, env) => handleCapacityLookup(req, env));
 
 router.all('*', () =>
   new Response(JSON.stringify({ error: 'Not found' }), {

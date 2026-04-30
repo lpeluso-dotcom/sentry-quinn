@@ -1,0 +1,31 @@
+{
+  "name": "capacity_lookup",
+  "description": "Looks up open dispatch capacity for a ServiceTitan business unit during a stated arrival window. Use BEFORE offering a customer a specific time slot. Returns a list of bookable {start,end} pairs or status='empty' when nothing is available. Results cache 5 minutes server-side to flatten repeat lookups during a single dispatch conversation.",
+  "speak_during_execution": true,
+  "speak_after_execution": true,
+  "url": "https://sentry-quinn.lpeluso.workers.dev/api/quinn/capacity-lookup",
+  "method": "POST",
+  "timeout_ms": 8000,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "business_unit_id": {
+        "type": "number",
+        "description": "ServiceTitan business unit id (e.g. 1001 for HVAC residential). Maps 1-to-1 to ST /dispatch capacity request."
+      },
+      "arrival_window": {
+        "type": "string",
+        "description": "Arrival window the caller agreed on, formatted as 'YYYY-MM-DD HH:MM-HH:MM' (e.g. '2026-05-02 13:00-15:00') or any free-form window tag. Used as the cache key suffix and passed verbatim to ST."
+      }
+    },
+    "required": ["business_unit_id", "arrival_window"]
+  },
+  "_notes": [
+    "STUB FOR REVIEW — Luke must register this in the Retell agent flow. Do not point at taylor-ai (Retell rule).",
+    "No 'name' parameter (collides with Retell internals — see qsc-infra/.claude/rules/retell.md).",
+    "Returns 200 even on error; flow branches on .status."
+  ]
+}
